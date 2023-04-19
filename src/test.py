@@ -1,23 +1,60 @@
 import cocotb
 from cocotb.clock import Clock
-from cocotb.triggers import RisingEdge, FallingEdge, Timer, ClockCycles
-
-
-segments = [ 63, 6, 91, 79, 102, 109, 124, 7, 127, 103 ]
+from cocotb.triggers import ClockCycles
+from cocotb.triggers import RisingEdge
+from cocotb.triggers import Timer
+import ctypes as ct
 
 @cocotb.test()
-async def test_7seg(dut):
-    dut._log.info("start")
-    clock = Clock(dut.clk, 10, units="us")
-    cocotb.start_soon(clock.start())
+async def test_dec_1(dut):
+    """ Testing the serial multiplier """
 
-    dut._log.info("reset")
-    dut.rst.value = 1
-    await ClockCycles(dut.clk, 10)
-    dut.rst.value = 0
+    A = 15
+    B = 10
+    C = A * B
 
-    dut._log.info("check all segments")
-    for i in range(10):
-        dut._log.info("check segment {}".format(i))
-        await ClockCycles(dut.clk, 1000)
-        assert int(dut.segments.value) == segments[i]
+    cocotb.start_soon(Clock(dut.clk, 10, units='ns').start())
+
+    dut.reset.value = 1
+    dut.valid.value = 0
+    dut.toggle.value = 0
+    await ClockCycles(dut.clk, 5, True)
+    dut.reset.value = 0
+
+    dut.din.value = B >> 4
+    dut.valid.value = 1
+    await ClockCycles(dut.clk, 7+1200)
+    dut.valid.value = 0
+    await ClockCycles(dut.clk, 3+1200)
+
+
+    dut.din.value = B
+    dut.valid.value = 1
+    await ClockCycles(dut.clk, 7+1200)
+    dut.valid.value = 0
+    await ClockCycles(dut.clk, 3+1200)
+
+    dut.din.value = A >> 4
+    dut.valid.value = 1
+    await ClockCycles(dut.clk, 7+1200)
+    dut.valid.value = 0
+    await ClockCycles(dut.clk, 3+1200)
+
+    dut.din.value = A
+    dut.valid.value = 1
+    await ClockCycles(dut.clk, 7+1200)
+    dut.valid.value = 0
+    await ClockCycles(dut.clk, 3+1200)
+
+    result = dut.dout.value
+    await ClockCycles(dut.clk, 500)
+
+    dut.toggle.value = 1
+    await ClockCycles(dut.clk, 500)
+    result =  result | (dut.dout.value<<8)
+
+    await ClockCycles(dut.clk, 500)
+
+    assert int(result) == C, f"assertion failed expected:{C}, got:{int(result)}"
+
+    await ClockCycles(dut.clk, 500)
